@@ -143,3 +143,55 @@ document.getElementById('contactForm')?.addEventListener('submit', function (e) 
   alert('Mensaje enviado (demo)');
   this.reset();
 });
+// === Fase 3: Transiciones y Storytelling ===
+
+// Crear overlay de transición
+const overlay = document.createElement('div');
+overlay.style.position = 'fixed';
+overlay.style.inset = '0';
+overlay.style.background = 'linear-gradient(90deg, var(--accent), var(--accent-2))';
+overlay.style.zIndex = '9999';
+overlay.style.pointerEvents = 'none';
+overlay.style.transform = 'scaleY(0)';
+overlay.style.transformOrigin = 'top';
+document.body.appendChild(overlay);
+
+// Función para reproducir transición
+function playTransition(callback) {
+  gsap.timeline()
+    .to(overlay, { scaleY: 1, duration: 0.5, ease: "power4.in" })
+    .add(() => { if (callback) callback(); })
+    .to(overlay, { scaleY: 0, duration: 0.5, ease: "power4.out", transformOrigin: 'bottom' });
+}
+
+// Animar entrada de secciones al hacer scroll
+gsap.utils.toArray('section').forEach((sec, i) => {
+  gsap.from(sec.querySelectorAll('.content > *'), {
+    opacity: 0,
+    y: 50,
+    stagger: 0.15,
+    duration: 1,
+    ease: "power3.out",
+    scrollTrigger: {
+      trigger: sec,
+      start: "top 80%",
+      onEnter: () => {
+        // Pequeña transición al entrar
+        playTransition();
+      }
+    }
+  });
+});
+
+// Animación suave al hacer clic en enlaces internos
+document.querySelectorAll('a[href^="#"]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(link.getAttribute('href'));
+    if (target) {
+      playTransition(() => {
+        gsap.to(window, { duration: 1, scrollTo: target, ease: "power2.inOut" });
+      });
+    }
+  });
+});
