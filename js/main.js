@@ -195,3 +195,59 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
     }
   });
 });
+// === Fase 4: Partículas 3D interactivas ===
+
+// Grupo para las partículas
+const particleGroup = new THREE.Group();
+scene.add(particleGroup);
+
+const particleCount = 150;
+const particleGeometry = new THREE.SphereGeometry(0.01, 8, 8);
+const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+for (let i = 0; i < particleCount; i++) {
+  const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
+  particle.position.set(
+    (Math.random() - 0.5) * 2, // X
+    (Math.random() - 0.5) * 2, // Y
+    (Math.random() - 0.5) * 1  // Z
+  );
+  particle.material.color.setHSL(Math.random(), 0.7, 0.6);
+  particleGroup.add(particle);
+}
+
+// Variables para interacción
+let mouseX = 0, mouseY = 0;
+window.addEventListener('mousemove', e => {
+  mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+  mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
+});
+
+// Animación de partículas
+function animateParticles(time) {
+  particleGroup.rotation.y += 0.001;
+  particleGroup.rotation.x += 0.0005;
+
+  particleGroup.children.forEach((p, i) => {
+    p.position.x += Math.sin(time * 0.001 + i) * 0.0005;
+    p.position.y += Math.cos(time * 0.001 + i) * 0.0005;
+  });
+
+  // Reacción al mouse
+  gsap.to(particleGroup.rotation, {
+    x: mouseY * 0.2,
+    y: mouseX * 0.2,
+    duration: 0.5,
+    ease: "power2.out"
+  });
+}
+
+// Modificar tu loop de animación para incluir partículas
+const originalAnimate = animate;
+animate = function (t) {
+  uniforms.u_time.value = t * 0.001;
+  animateParticles(t);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+};
+animate();
