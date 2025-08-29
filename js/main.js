@@ -87,72 +87,49 @@ document.addEventListener("DOMContentLoaded", () => {
   const fxCam = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 50);
   fxCam.position.z = 2.2;
 
-  // Partículas como Points (visibles y ligeras)
+  // Partículas rojas visibles
   const COUNT = 350;
   const geom = new THREE.BufferGeometry();
   const pos = new Float32Array(COUNT * 3);
-  const col = new Float32Array(COUNT * 3);
   const sizeArray = new Float32Array(COUNT);
 
   for (let i = 0; i < COUNT; i++) {
     const ix = i * 3;
     pos[ix + 0] = (Math.random() - 0.5) * 2.0;
     pos[ix + 1] = (Math.random() - 0.5) * 2.0;
-    pos[ix + 2] = Math.random() * 1.2; // delante del fondo
-    const hue = 0.55 + Math.random() * 0.15; // gama frío
-    col[ix + 0] = hue;
-    col[ix + 1] = 0.7;
-    col[ix + 2] = 1.0;
+    pos[ix + 2] = Math.random() * 1.2;
     sizeArray[i] = 10 + Math.random() * 20;
   }
   geom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geom.setAttribute("size", new THREE.BufferAttribute(sizeArray, 1));
 
-  // Shader material para puntos con tamaño y color en HSL convertido en frag
   const pointsMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     uniforms: {
       u_time: { value: 0.0 },
-      u_opacity: { value: 0.9 },
-      u_mouse: { value: new THREE.Vector2(0, 0) }
+      u_opacity: { value: 0.9 }
     },
     vertexShader: `
       attribute float size;
-      varying vec3 vColorHSL;
       void main() {
-        vColorHSL = vec3(position.z * 0.0 + 0.6, 0.8, 0.6);
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_PointSize = size * (300.0 / -mvPosition.z);
         gl_Position = projectionMatrix * mvPosition;
       }
-    `.replace("attribute float size;", "attribute float size;"),
+    `,
     fragmentShader: `
       precision highp float;
       uniform float u_opacity;
-      // Convert HSL-ish to RGB simple tint
-      vec3 hsl2rgb(float h, float s, float l){
-        float c = (1.0 - abs(2.0*l - 1.0)) * s;
-        float x = c * (1.0 - abs(mod(h*6.0, 2.0) - 1.0));
-        float m = l - 0.5*c;
-        vec3 rgb;
-        if (h < 1.0/6.0) rgb = vec3(c, x, 0.0);
-        else if (h < 2.0/6.0) rgb = vec3(x, c, 0.0);
-        else if (h < 3.0/6.0) rgb = vec3(0.0, c, x);
-        else if (h < 4.0/6.0) rgb = vec3(0.0, x, c);
-        else if (h < 5.0/6.0) rgb = vec3(x, 0.0, c);
-        else rgb = vec3(c, 0.0, x);
-        return rgb + vec3(m);
-      }
       void main() {
         float r = length(gl_PointCoord - vec2(0.5));
         float alpha = smoothstep(0.5, 0.2, r) * u_opacity;
-        vec3 rgb = hsl2rgb(0.62, 0.8, 0.6);
-        gl_FragColor = vec4(rgb, alpha);
+        gl_FragColor = vec4(1.0, 0.0, 0.0, alpha); // rojo brillante
       }
     `
   });
-  geom.setAttribute("size", new THREE.BufferAttribute(sizeArray, 1));
+
   const points = new THREE.Points(geom, pointsMat);
   fxScene.add(points);
 
@@ -174,13 +151,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================
   // 4) Loops de animación
   // =========================
-  let mouseX = 0, mouseY = 0;
-  window.addEventListener("mousemove", (e) => {
-    mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-    mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
-    uniforms.u_mouse.value.set(e.clientX / window.innerWidth, 1.0 - e.clientY / window.innerHeight);
-  });
-
   function loopBg(t) {
     uniforms.u_time.value = t * 0.001;
     bgRenderer.render(bgScene, bgCam);
@@ -191,10 +161,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function loopFx(t) {
     points.rotation.y += 0.0008;
     points.rotation.x += 0.0004;
-    // ligera reacción al mouse
-    points.rotation.y += (mouseX * 0.002);
-    points.rotation.x += (mouseY * 0.002);
-    pointsMat.uniforms.u_time.value = t * 0.001;
     fxRenderer.render(fxScene, fxCam);
     requestAnimationFrame(loopFx);
   }
@@ -209,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function playTransition(callback) {
+    console.log("playTransition ejecutado");
     showFX(true);
     gsap.timeline()
       .to(overlay, { scaleY: 1, duration: 0.45, ease: "power4.in" })
@@ -218,10 +185,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
-  // Disparo automático (validación visual)
+  // Disparo automático forzado
   setTimeout(() => {
-    if (document.visibilityState === "visible") playTransition();
-  }, 800);
+    playTransition();
+  }, 1500);
 
   // =========================
   // 6) Animaciones de contenido
@@ -232,59 +199,4 @@ document.addEventListener("DOMContentLoaded", () => {
     gsap.utils.toArray(".fade-in").forEach((el, i) => {
       gsap.fromTo(el,
         { opacity: 0, y: 20, rotateX: -10 },
-        { opacity: 1, y: 0, rotateX: 0, duration: 1, delay: i * 0.1, ease: "power3.out",
-          scrollTrigger: { trigger: el, start: "top 85%" } }
-      );
-    });
-
-    gsap.utils.toArray("h1").forEach(title => {
-      gsap.to(title, {
-        y: -30, ease: "none",
-        scrollTrigger: { trigger: title, start: "top bottom", scrub: true }
-      });
-    });
-
-    // Storytelling: transición al entrar cada sección
-    gsap.utils.toArray("section").forEach(sec => {
-      gsap.from(sec.querySelectorAll(".content > *"), {
-        opacity: 0, y: 50, stagger: 0.15, duration: 1, ease: "power3.out",
-        scrollTrigger: { trigger: sec, start: "top 80%", onEnter: () => playTransition() }
-      });
-    });
-  } else {
-    // Fallback: IntersectionObserver para disparar transición si GSAP no está
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) playTransition();
-      });
-    }, { threshold: 0.2 });
-    document.querySelectorAll("section").forEach(s => io.observe(s));
-  }
-
-  // =========================
-  // 7) Scroll suave nativo (sin plugins)
-  // =========================
-  document.querySelectorAll('a[href^="#"]').forEach(link => {
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      const target = document.querySelector(link.getAttribute("href"));
-      if (!target) return;
-      playTransition(() => {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
-  });
-
-  // =========================
-  // 8) Resize
-  // =========================
-  window.addEventListener("resize", () => {
-    bgRenderer.setSize(window.innerWidth, window.innerHeight);
-    fxRenderer.setSize(window.innerWidth, window.innerHeight);
-    fxCam.aspect = window.innerWidth / window.innerHeight;
-    fxCam.updateProjectionMatrix();
-  });
-
-  // Debug helper
-  window.playTransition = playTransition;
-});
+        { opacity: 1, y: 0,
