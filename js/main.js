@@ -1,7 +1,7 @@
-// === WebGL Background ===
+// === WebGL Background Mejorado ===
 const canvas = document.getElementById('bgCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-const DPR = Math.min(window.devicePixelRatio || 1, 1.2);
+const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
 renderer.setPixelRatio(DPR);
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -15,7 +15,15 @@ const uniforms = {
   u_color2: { value: new THREE.Color(0x7a5cff) }
 };
 
-const vert = `varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.0);}`;
+const vert = `
+  varying vec2 vUv;
+  void main(){
+    vUv = uv;
+    gl_Position = vec4(position, 1.0);
+  }
+`;
+
+// Shader con ruido y distorsión suave
 const frag = `
   precision highp float;
   varying vec2 vUv;
@@ -23,17 +31,49 @@ const frag = `
   uniform vec2 u_mouse;
   uniform vec3 u_color1;
   uniform vec3 u_color2;
+
+  // Función de ruido simple
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+  }
+
   void main(){
     vec2 uv = vUv;
     float dist = distance(uv, u_mouse);
+
+    // Distorsión animada
+    uv.x += 0.03 * sin(u_time + uv.y * 10.0);
+    uv.y += 0.03 * cos(u_time + uv.x * 10.0);
+
+    // Ruido animado
+    float n = noise(uv * 5.0 + u_time * 0.1);
+
+    // Onda base
     float wave = sin(uv.x * 10.0 + u_time) + cos(uv.y * 10.0 + u_time);
-    vec3 col = mix(u_color1, u_color2, wave * 0.5 + 0.5);
-    col += (1.0 - dist) * 0.2;
+
+    // Mezcla de colores
+    vec3 col = mix(u_color1, u_color2, wave * 0.5 + 0.5 + n * 0.2);
+    col += (1.0 - dist) * 0.15;
+
     gl_FragColor = vec4(col, 1.0);
   }
 `;
 
-const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: vert, fragmentShader: frag });
+const mat = new THREE.ShaderMaterial({
+  uniforms,
+  vertexShader: vert,
+  fragmentShader: frag
+});
 scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
 
 function animate(t) {
@@ -49,22 +89,51 @@ window.addEventListener('resize', () => {
 });
 
 window.addEventListener('pointermove', e => {
-  uniforms.u_mouse.value.set(e.clientX / window.innerWidth, 1.0 - e.clientY / window.innerHeight);
+  uniforms.u_mouse.value.set(
+    e.clientX / window.innerWidth,
+    1.0 - e.clientY / window.innerHeight
+  );
 });
 
-// === GSAP Animations ===
+// === GSAP Animations Mejoradas ===
 gsap.registerPlugin(ScrollTrigger);
+
+// Fade-in con leve rotación
 gsap.utils.toArray('.fade-in').forEach((el, i) => {
-  gsap.fromTo(el, { opacity: 0, y: 20 }, {
-    opacity: 1, y: 0, duration: 1, delay: i * 0.1,
-    scrollTrigger: { trigger: el, start: "top 85%" }
-  });
+  gsap.fromTo(el,
+    { opacity: 0, y: 20, rotateX: -10 },
+    {
+      opacity: 1,
+      y: 0,
+      rotateX: 0,
+      duration: 1,
+      delay: i * 0.1,
+      ease: "power3.out",
+      scrollTrigger: { trigger: el, start: "top 85%" }
+    }
+  );
 });
 
+// Parallax más suave en títulos
 gsap.utils.toArray('h1').forEach(title => {
   gsap.to(title, {
     y: -30,
-    scrollTrigger: { trigger: title, start: "top bottom", scrub: true }
+    ease: "none",
+    scrollTrigger: {
+      trigger: title,
+      start: "top bottom",
+      scrub: true
+    }
+  });
+});
+
+// Microinteracción en botones
+gsap.utils.toArray('.btn').forEach(btn => {
+  btn.addEventListener('mouseenter', () => {
+    gsap.to(btn, { scale: 1.08, duration: 0.3, ease: "power2.out" });
+  });
+  btn.addEventListener('mouseleave', () => {
+    gsap.to(btn, { scale: 1, duration: 0.3, ease: "power2.inOut" });
   });
 });
 
