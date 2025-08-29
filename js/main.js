@@ -32,7 +32,6 @@ const frag = `
   uniform vec3 u_color1;
   uniform vec3 u_color2;
 
-  // Función de ruido simple
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
   }
@@ -51,17 +50,12 @@ const frag = `
     vec2 uv = vUv;
     float dist = distance(uv, u_mouse);
 
-    // Distorsión animada
     uv.x += 0.03 * sin(u_time + uv.y * 10.0);
     uv.y += 0.03 * cos(u_time + uv.x * 10.0);
 
-    // Ruido animado
     float n = noise(uv * 5.0 + u_time * 0.1);
-
-    // Onda base
     float wave = sin(uv.x * 10.0 + u_time) + cos(uv.y * 10.0 + u_time);
 
-    // Mezcla de colores
     vec3 col = mix(u_color1, u_color2, wave * 0.5 + 0.5 + n * 0.2);
     col += (1.0 - dist) * 0.15;
 
@@ -76,8 +70,53 @@ const mat = new THREE.ShaderMaterial({
 });
 scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
 
+// === Partículas 3D interactivas ===
+const particleGroup = new THREE.Group();
+scene.add(particleGroup);
+
+const particleCount = 150;
+const particleGeometry = new THREE.SphereGeometry(0.01, 8, 8);
+const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+for (let i = 0; i < particleCount; i++) {
+  const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
+  particle.position.set(
+    (Math.random() - 0.5) * 2,
+    (Math.random() - 0.5) * 2,
+    (Math.random() - 0.5) * 1
+  );
+  particle.material.color.setHSL(Math.random(), 0.7, 0.6);
+  particleGroup.add(particle);
+}
+particleGroup.visible = false;
+
+let mouseX = 0, mouseY = 0;
+window.addEventListener('mousemove', e => {
+  mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+  mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
+});
+
+function animateParticles(time) {
+  particleGroup.rotation.y += 0.001;
+  particleGroup.rotation.x += 0.0005;
+
+  particleGroup.children.forEach((p, i) => {
+    p.position.x += Math.sin(time * 0.001 + i) * 0.0005;
+    p.position.y += Math.cos(time * 0.001 + i) * 0.0005;
+  });
+
+  gsap.to(particleGroup.rotation, {
+    x: mouseY * 0.2,
+    y: mouseX * 0.2,
+    duration: 0.5,
+    ease: "power2.out"
+  });
+}
+
+// === Animación principal ===
 function animate(t) {
   uniforms.u_time.value = t * 0.001;
+  animateParticles(t);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
@@ -95,8 +134,8 @@ window.addEventListener('pointermove', e => {
   );
 });
 
-// === GSAP Animations Mejoradas ===
-gsap.registerPlugin(ScrollTrigger);
+// === GSAP Animations ===
+gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 // Fade-in con leve rotación
 gsap.utils.toArray('.fade-in').forEach((el, i) => {
@@ -114,7 +153,7 @@ gsap.utils.toArray('.fade-in').forEach((el, i) => {
   );
 });
 
-// Parallax más suave en títulos
+// Parallax en títulos
 gsap.utils.toArray('h1').forEach(title => {
   gsap.to(title, {
     y: -30,
@@ -137,15 +176,7 @@ gsap.utils.toArray('.btn').forEach(btn => {
   });
 });
 
-// === Form submission (demo) ===
-document.getElementById('contactForm')?.addEventListener('submit', function (e) {
-  e.preventDefault();
-  alert('Mensaje enviado (demo)');
-  this.reset();
-});
-// === Fase 3: Transiciones y Storytelling ===
-
-// Crear overlay de transición
+// === Cortina de transición ===
 const overlay = document.createElement('div');
 overlay.style.position = 'fixed';
 overlay.style.inset = '0';
@@ -156,16 +187,26 @@ overlay.style.transform = 'scaleY(0)';
 overlay.style.transformOrigin = 'top';
 document.body.appendChild(overlay);
 
-// Función para reproducir transición
 function playTransition(callback) {
   gsap.timeline()
-    .to(overlay, { scaleY: 1, duration: 0.5, ease: "power4.in" })
+    .to(overlay, {
+      scaleY: 1,
+      duration: 0.5,
+      ease: "power4.in",
+      onStart: () => { particleGroup.visible = true; }
+    })
     .add(() => { if (callback) callback(); })
-    .to(overlay, { scaleY: 0, duration: 0.5, ease: "power4.out", transformOrigin: 'bottom' });
+    .to(overlay, {
+      scaleY: 0,
+      duration: 0.5,
+      ease: "power4.out",
+      transformOrigin: 'bottom',
+      onComplete: () => { particleGroup.visible = false; }
+    });
 }
 
-// Animar entrada de secciones al hacer scroll
-gsap.utils.toArray('section').forEach((sec, i) => {
+// Animar entrada de secciones
+gsap.utils.toArray('section').forEach(sec => {
   gsap.from(sec.querySelectorAll('.content > *'), {
     opacity: 0,
     y: 50,
@@ -175,79 +216,16 @@ gsap.utils.toArray('section').forEach((sec, i) => {
     scrollTrigger: {
       trigger: sec,
       start: "top 80%",
-      onEnter: () => {
-        // Pequeña transición al entrar
-        playTransition();
-      }
+      onEnter: () => { playTransition(); }
     }
   });
 });
 
-// Animación suave al hacer clic en enlaces internos
+// Scroll suave en enlaces internos
 document.querySelectorAll('a[href^="#"]').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault();
     const target = document.querySelector(link.getAttribute('href'));
     if (target) {
       playTransition(() => {
-        gsap.to(window, { duration: 1, scrollTo: target, ease: "power2.inOut" });
-      });
-    }
-  });
-});
-// === Fase 4: Partículas 3D interactivas ===
-
-// Grupo para las partículas
-const particleGroup = new THREE.Group();
-scene.add(particleGroup);
-
-const particleCount = 150;
-const particleGeometry = new THREE.SphereGeometry(0.01, 8, 8);
-const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-
-for (let i = 0; i < particleCount; i++) {
-  const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
-  particle.position.set(
-    (Math.random() - 0.5) * 2, // X
-    (Math.random() - 0.5) * 2, // Y
-    (Math.random() - 0.5) * 1  // Z
-  );
-  particle.material.color.setHSL(Math.random(), 0.7, 0.6);
-  particleGroup.add(particle);
-}
-
-// Variables para interacción
-let mouseX = 0, mouseY = 0;
-window.addEventListener('mousemove', e => {
-  mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-  mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
-});
-
-// Animación de partículas
-function animateParticles(time) {
-  particleGroup.rotation.y += 0.001;
-  particleGroup.rotation.x += 0.0005;
-
-  particleGroup.children.forEach((p, i) => {
-    p.position.x += Math.sin(time * 0.001 + i) * 0.0005;
-    p.position.y += Math.cos(time * 0.001 + i) * 0.0005;
-  });
-
-  // Reacción al mouse
-  gsap.to(particleGroup.rotation, {
-    x: mouseY * 0.2,
-    y: mouseX * 0.2,
-    duration: 0.5,
-    ease: "power2.out"
-  });
-}
-
-// Modificar tu loop de animación para incluir partículas
-const originalAnimate = animate;
-animate = function (t) {
-  uniforms.u_time.value = t * 0.001;
-  animateParticles(t);
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
-};
-animate();
+        gsap.to(window, { duration: 1, scrollTo: target, ease: "power2.inOut
