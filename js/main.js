@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   const scene = new THREE.Scene();
+  // Importante: el ortho camera tiene near=0 y far=1. Todo lo que esté en z<0 se recorta.
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
   const uniforms = {
@@ -71,25 +72,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: vert, fragmentShader: frag });
   const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
-  bgMesh.renderOrder = -1; // Asegura que lo demás se dibuje por encima
+  bgMesh.renderOrder = -1; // Fondo primero
   scene.add(bgMesh);
 
-  // === Partículas 3D interactivas ===
+  // === Figuras 3D nuevas: Octaedros wireframe ===
   const particleGroup = new THREE.Group();
   scene.add(particleGroup);
 
-  const particleCount = 150;
-  const particleGeometry = new THREE.SphereGeometry(0.01, 8, 8);
-  const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const particleCount = 120; // ligero y visible
+  const particleGeometry = new THREE.OctahedronGeometry(0.025, 0); // forma "diamante"
+  const baseMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.9
+  });
 
   for (let i = 0; i < particleCount; i++) {
-    const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
+    const m = baseMaterial.clone();
+    m.color.setHSL(Math.random(), 0.6, 0.65);
+    const particle = new THREE.Mesh(particleGeometry, m);
+
+    // Muy importante: z entre 0.3 y 0.9 para que NUNCA queden detrás del plano del shader (z=0)
+    const z = 0.3 + Math.random() * 0.6;
     particle.position.set(
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 1
+      (Math.random() - 0.5) * 1.8, // X
+      (Math.random() - 0.5) * 1.8, // Y
+      z
     );
-    particle.material.color.setHSL(Math.random(), 0.7, 0.6);
+
+    // Rotación inicial aleatoria
+    particle.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+
+    // Velocidad/phase para animar suavemente
+    particle.userData.phase = Math.random() * Math.PI * 2;
+    particle.userData.speed = 0.5 + Math.random() * 1.0;
+
     particleGroup.add(particle);
   }
   particleGroup.visible = false;
@@ -101,20 +119,37 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function animateParticles(time) {
+    const t = time * 0.001;
+
+    // Giro sutil del grupo
     particleGroup.rotation.y += 0.001;
     particleGroup.rotation.x += 0.0005;
 
-    particleGroup.children.forEach((p, i) => {
-      p.position.x += Math.sin(time * 0.001 + i) * 0.0005;
-      p.position.y += Math.cos(time * 0.001 + i) * 0.0005;
-    });
+    // Reacción al cursor
+    if (typeof gsap !== 'undefined') {
+      gsap.to(particleGroup.rotation, {
+        x: mouseY * 0.25,
+        y: mouseX * 0.25,
+        duration: 0.5,
+        ease: "power2.out",
+        overwrite: 'auto'
+      });
+    }
 
-    gsap.to(particleGroup.rotation, {
-      x: mouseY * 0.2,
-      y: mouseX * 0.2,
-      duration: 0.5,
-      ease: "power2.out",
-      overwrite: 'auto'
+    // Oscilación y rotación por instancia
+    particleGroup.children.forEach((p) => {
+      const ph = p.userData.phase;
+      const sp = p.userData.speed;
+
+      p.rotation.x += 0.005 * sp;
+      p.rotation.y += 0.007 * sp;
+
+      const amp = 0.02; // amplitud de vaivén
+      p.position.x += Math.sin(t * sp + ph) * 0.0008;
+      p.position.y += Math.cos(t * sp + ph) * 0.0008;
+      // Pequeño "breathe" en Z (manteniéndose en [0.3, 0.9])
+      const zBase = Math.max(0.3, Math.min(0.9, p.position.z));
+      p.position.z = zBase + Math.sin(t * 0.5 + ph) * 0.01;
     });
   }
 
@@ -210,7 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
-  // Animar entrada de secciones
+  // Animar entrada de secciones (storytelling)
   gsap.utils.toArray('section').forEach(sec => {
     const items = sec.querySelectorAll('.content > *');
     if (!items || !items.length) return;
@@ -242,6 +277,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Exponer para debug manual desde consola (opcional)
+  // Disparo de prueba automático (puedes removerlo cuando confirmes que se ve)
+  setTimeout(() => {
+    if (document.visibilityState === 'visible') {
+      console.log("Prueba automática: cortina + octaedros");
+      playTransition();
+    }
+  }, 1200);
+
+  // Exponer para debug manual
   window.playTransition = playTransition;
 });
