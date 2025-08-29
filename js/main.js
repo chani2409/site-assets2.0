@@ -69,7 +69,9 @@ const mat = new THREE.ShaderMaterial({
   vertexShader: vert,
   fragmentShader: frag
 });
-scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+bgMesh.renderOrder = -1;
+scene.add(bgMesh);
 
 // === Partículas 3D interactivas ===
 const particleGroup = new THREE.Group();
