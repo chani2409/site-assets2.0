@@ -1,4 +1,5 @@
-// === WebGL Background Mejorado ===
+document.addEventListener("DOMContentLoaded", () => {
+  //// === WebGL Background Mejorado ===
 const canvas = document.getElementById('bgCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -229,3 +230,4 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
     if (target) {
       playTransition(() => {
         gsap.to(window, { duration: 1, scrollTo: target, ease: "power2.inOut
+});
