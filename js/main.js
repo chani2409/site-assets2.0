@@ -205,6 +205,10 @@ function playTransition(callback) {
       ease: "power4.out",
       transformOrigin: 'bottom',
       onComplete: () => { particleGroup.visible = false; }
+      setTimeout(() => {
+  console.log("Prueba: lanzando cortina y partículas...");
+  playTransition();
+}, 2000);
     });
 }
 
